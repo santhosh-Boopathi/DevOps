@@ -1,0 +1,60 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID = '***********'
+        AWS_SECRET_ACCESS_KEY = '**********************'
+        AWS_DEFAULT_REGION = 'ap-southeast-2'  // Set your region here
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'master', url: 'https://github.com/santhosh-Boopathi/DevOps.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t santhoshb7/my-custom-app .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh '''
+                docker login -u santhoshb7 -p ********
+                docker tag santhoshb7/my-custom-app:latest santhoshb7/my-custom-app:latest
+                docker push santhoshb7/my-custom-app:latest
+                '''
+            }
+        }
+
+        stage('Deploy on EC2') {
+            steps {
+                sh '''
+                # Stop any running container before deployment
+                docker stop my-custom-app || true
+                docker rm my-custom-app || true
+                
+                # Pull latest image and deploy
+                docker pull santhoshb7/my-custom-app:latest
+                docker run -d -p 3000:80 --name my-node-app --restart unless-stopped santhoshb7/my-custom-app:latest
+                '''
+            }
+        }
+
+        stage('Send SNS Notification') {
+            steps {
+                sh '''
+                aws sns publish \
+                --topic-arn arn:aws:sns:ap-southeast-2:277707127137:project \
+                --subject "Jenkins Build Successful" \
+                --message "The Jenkins build for your project has completed successfully!"
+                '''
+            }
+        }
+    }
+}
